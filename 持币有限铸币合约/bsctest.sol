@@ -801,7 +801,7 @@ contract Token is ERC20, Owner {
         uint256 newBalance = IERC20(usdtToken).balanceOf(address(this));
 
         _addLiquidity(newBalance, balanceOf(address(this)));
-//
+
         emit SwapAndLiquidity(1, 1, tokens);
     }
 
