@@ -753,7 +753,7 @@ contract Token is ERC20, Owner {
     }
 
     function _mintInterest(address account, uint256 _shieldBlack) internal {
-        if (account != address(uniswapV2Pair)) {
+        if (account != uniswapV2Pair) {
             uint256 interest = getInterest(account);
             if (interest > 0) {
 
