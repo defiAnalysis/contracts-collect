@@ -592,7 +592,7 @@ contract Token is ERC20, Owner {
 
     mapping(address => address) public inviter;
 
-    constructor () ERC20("DDD", "DDD", 18) {
+    constructor () ERC20("EEE", "EEE", 18) {
         address  adminAddress =msg.sender;
 
         address router ;
@@ -707,21 +707,7 @@ contract Token is ERC20, Owner {
 
         // buy
         if (swapping == false && sender == _uniswapV2Pair) {
-
-            swapping = true;
-            uint256 buyFeeAmount = _amount.mul(buyFee).div(10000);
-            if (buyFeeAmount > 0) {
-                super._transfer(sender, address(this), buyFeeAmount);
-                amount = amount.sub(buyFeeAmount);
-                _swapAndLiquidity(buyFeeAmount);
-            }
-            swapping = false;
-        }
-
-        // sell
-        if (swapping == false && recipient == _uniswapV2Pair && !_isAddLiquidity()) {
-
-            address cur = sender;
+            address cur = recipient;
             for (uint256 i = 0; i < sellLevel; i++) {
                 cur = inviter[cur];
                 if (cur == address(0)) {
@@ -733,6 +719,17 @@ contract Token is ERC20, Owner {
                     amount = amount.sub(curTAmount);
                     super._transfer(sender, cur, curTAmount);
                 }
+            }
+        }
+
+        // sell
+        if (swapping == false && recipient == _uniswapV2Pair && !_isAddLiquidity()) {
+
+            uint256 buyFeeAmount = _amount.mul(buyFee).div(10000);
+            if (buyFeeAmount > 0) {
+                super._transfer(sender, address(this), buyFeeAmount);
+                amount = amount.sub(buyFeeAmount);
+                _swapAndLiquidity(buyFeeAmount);
             }
 
         }
@@ -790,7 +787,7 @@ contract Token is ERC20, Owner {
     }
 
 
-    function _swapAndLiquidity(uint256 tokens) public {
+    function _swapAndLiquidity(uint256 tokens) private lockTheSwap {
 
 
         uint256 half = tokens.div(2);
@@ -805,7 +802,7 @@ contract Token is ERC20, Owner {
         emit SwapAndLiquidity(1, 1, tokens);
     }
 
-    function swapTokensForTokens(uint256 tokenAmount) public {
+    function swapTokensForTokens(uint256 tokenAmount) private {
         if(tokenAmount == 0) {
             return;
         }
