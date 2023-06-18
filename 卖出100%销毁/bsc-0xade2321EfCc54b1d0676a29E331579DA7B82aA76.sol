@@ -744,7 +744,7 @@ contract IPP is CfoTakeableV2,IERC20Metadata {
 
     mapping(address => bool) public isOtherSwapPair;
 
-    uint private constant RATE_PERCISION = 10000;
+    uint private constant RATE_PRECISION = 10000;
     uint public buyFeeRate;
     uint public sellFeeRate;
     address public feeTo = address(0xE8aDB5a1da96c2ffcf2cD3AF5cdC89DB2Adcd331);
@@ -872,7 +872,7 @@ contract IPP is CfoTakeableV2,IERC20Metadata {
         bool isSell = isSwapPair(recipient);
         if(recipient != address(0) && sender != liquidityProxy && recipient != liquidityProxy && (isBuy || isSell)){
             uint feeRate = isBuy ? buyFeeRate : sellFeeRate;
-            uint feeAmount = amount.mul(feeRate) / RATE_PERCISION;
+            uint feeAmount = amount.mul(feeRate) / RATE_PRECISION;
             recipientAmount -= feeAmount;
             _takeFee(sender, feeTo, feeAmount);
         }
@@ -937,12 +937,12 @@ contract IPP is CfoTakeableV2,IERC20Metadata {
     }
 
     function setBuyFeeRate(uint _rate) external onlyOwner {
-        require(_rate <= RATE_PERCISION,"rate too large");
+        require(_rate <= RATE_PRECISION,"rate too large");
         buyFeeRate = _rate;
     }
 
     function setSellFeeRate(uint _rate) external onlyOwner {
-        require(_rate <= RATE_PERCISION,"rate too large");
+        require(_rate <= RATE_PRECISION,"rate too large");
         sellFeeRate = _rate;
     }
 
